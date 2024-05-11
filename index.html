@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV File Upload</title>
+</head>
+<body>
+    <h1>Upload a CSV File</h1>
+    <input type="file" id="csvFileInput">
+    <button onclick="handleUpload()">Upload</button>
+    <div id="headerDisplay"></div>
+
+    <!-- Load Pyodide and Python code -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/pyodide/v0.18.1/full/pyodide.js"></script>
+    <script type="text/javascript">
+        async function loadPyodideAndExecute() {
+            // Load Pyodide
+            const pyodideUrl = 'https://cdn.jsdelivr.net/pyodide/v0.18.1/full/';
+            const pyodide = await loadPyodide({ indexURL: pyodideUrl });
+
+            // Check if Pyodide is properly loaded
+            if (!pyodide) {
+                console.error('Failed to load Pyodide.');
+                return;
+            }
+
+            try {
+                // Execute Python code to import Pandas and define the handleUpload function
+                await pyodide.loadPackage('pandas');
+                await pyodide.runPythonAsync(`
+                    import pandas as pd
+                    
+                    def handle_upload(file_content):
+                        try:
+                            data = pd.read_csv(file_content)
+                            header = data.columns.tolist()
+                            return header
+                        except Exception as e:
+                            return str(e)
+                `);
+
+                // Define the handleUpload function after Pyodide setup
+                window.handleUpload = async function() {
+                    const fileInput = document.getElementById('csvFileInput');
+                    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+                        console.error('No file selected.');
+                        return;
+                    }
+
+                    const file = fileInput.files[0];
+                    const fileReader = new FileReader();
+
+                    fileReader.onload = async function(event) {
+                        const fileContent = event.target.result;
+                        const header = await pyodide.globals.handle_upload(fileContent);
+                        document.getElementById('headerDisplay').textContent = `CSV File Header: ${header}`;
+                    };
+
+                    fileReader.readAsText(file);
+                };
+            } catch (error) {
+                console.error('Error setting up Pyodide:', error);
+            }
+        }
+
+        loadPyodideAndExecute();
+    </script>
+</body>
+</html>
